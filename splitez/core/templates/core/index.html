@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SplitEz</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center p-4">
+    <h1 class="text-3xl font-bold mb-6">SplitEz</h1>
+    <div class="mb-4">
+        {% if user.is_authenticated %}
+            <p> Welcome, {{ user.username }}! </p>
+            <form method="post" action="{% url 'logout' %}" style="display:inline;">
+                {% csrf_token %}
+                <button type="submit" class="text-blue-500 hover:underline">Logout</button>
+            </form>
+        {% else %}
+            <a href="{% url 'login' %}" class="text-blue-500"> Login </a> 
+            <a href="{% url 'register' %}" class="text-blue-500"> Register </a>
+        {% endif %}
+    </div>
+    <div class="bg-white p-6 rounded-lg shadow-md w-full max-w-md">
+        <h2 class="text-xl font-semibold mb-4">Create or Join Group</h2>
+        <input id="group-name" type="text" placeholder="Group Name" class="w-full p-2 mb-4 border rounded">
+        <button onclick="createGroup()" class="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600">Create Group</button>
+        <div class="mt-4">
+            <input id="join-group-name" type="text" placeholder="Enter Group Name to Join" aria-label="Join Group Name" class="w-full p-2 mb-4 border rounded">
+            <button onclick="joinGroup()" class="w-full bg-green-500 text-white p-2 rounded hover:bg-green-600">Join Group</button>
+            <div id="error-message" class="text-red-500 mt-2 hidden"></div>
+        </div>
+    </div>
+    {% if user.is_authenticated %}
+        <div class="bg-white p-6 rounded-lg shadow-md w-full max-w-md mt-6">
+            <h2 class="text-xl font-semibold mb-4">Your Groups</h2>
+            <ul class="list-disc pl-5">
+                {% for group in groups %}
+                    <li><a href="{% url 'group_detail' group.id %}" class="text-blue-500">{{ group.name }}</a></li>
+                {% empty %}
+                    <li>You are not in any groups yet.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+    <script>
+        const csrfToken = '{{ csrf_token }}';
+        console.log("CSRF Token:", csrfToken);
+        async function createGroup() {
+            const name = document.getElementById('group-name').value;
+            console.log("Group name input:", name);
+            if (!name) {
+                document.getElementById('error-message').textContent = 'Please enter a group name';
+                document.getElementById('error-message').classList.remove('hidden');
+                return;
+            }
+            const response = await fetch('/create_group/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+                body: JSON.stringify({ name })
+            });
+            const data = await response.json();
+            if (data.group_id) {
+                window.location.href = `/group/${data.group_id}/`;
+            } else {
+                document.getElementById('error-message').textContent = data.error || 'Error creating group';
+                document.getElementById('error-message').classList.remove('hidden');
+            }
+        }
+        async function joinGroup() {
+            const groupName = document.getElementById('join-group-name').value;
+            if (!groupName) {
+                document.getElementById('error-message').textContent = 'Please enter a group name to join';
+                document.getElementById('error-message').classList.remove('hidden');
+                return;
+            }
+            const response = await fetch(`/join_group/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+                body: JSON.stringify({ group_name: groupName })
+            });
+            const data = await response.json();
+            if (data.success) {
+                window.location.href = `/group/${data.group_id}/`;
+            } else {
+                document.getElementById('error-message').textContent = data.error || 'Error joining group';
+                document.getElementById('error-message').classList.remove('hidden');
+            }
+        }
+    </script>
+</body>
+</html>

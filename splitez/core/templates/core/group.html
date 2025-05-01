@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ group.name }} - SplitEz</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center p-4">
+    <div class="mb-4">
+        {% if user.is_authenticated %}
+            <p> Welcome, {{ user.username }}! </p>
+            <form method ="post" action="{% url 'logout' %}" style="display:inline;">
+                {% csrf_token %}
+                <button type="submit" class="text-blue-500 hover:underline">Logout</button>
+            </form>
+        {% endif %}
+    </div>
+    <h1 class="text-3xl font-bold mb-6">{{ group.name }}</h1>
+    <div class="bg-white p-6 rounded-lg shadow-md w-full max-w-md">
+        <input id="expense-desc" type="text" placeholder="Expense Description" class="w-full p-2 mb-4 border rounded">
+        <input id="expense-amount" type="number" placeholder="Expense Amount" class="w-full p-2 mb-4 border rounded">
+        <select id="expense-category" aria-label="Expense Category" class="w-full p-2 mb-4 border rounded"> 
+            <option value=""> Select Category </option>
+            <option value="food"> Food </option>
+            <option value="rent"> Rent </option>
+            <option value="travel"> Travel </option>
+            <option value="other"> Other </option>
+        </select>
+        <button onclick="addExpense()" class="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600">Add Expense</button>
+        <div id="error-message" class="text-red-500 mt-2 hidden"></div>
+        <h3 class="text-lg font-semibold mt-6 mb-2">Expenses</h3>
+        <ul class="list-disc pl-5">
+            {% for expense in expenses %}
+                <li>{{ expense.description }}: ${{ expense.amount }} (Paid by {{ expense.paid_by.username }}) {% if expense.category %} - {{ expense.category|title }}{% endif %} </li>
+            {% empty %}
+                <li>No expenses yet.</li>
+            {% endfor %}
+        </ul>
+        <div>
+            <h3 class="text-lg font-semibold mt-6 mb-2">Debts</h3>
+            <ul class="list-disc pl-5">
+                {% for debt in debts %}
+                    <li>
+                        {{ debt.from_user.username }} owes {{ debt.to_user.username }} ${{ debt.amount }} (Status: {{ debt.status }})
+                        {% if debt.from_user == user and debt.status == "pending" %}
+                            <button onclick="payDebt({{ debt.id }})" class="text-blue-500 hover:underline">Pay Dues</button>
+                        {% endif %}
+                    </li>
+                {% empty %}
+                    <li>No dues yet.</li>
+                {% endfor %}
+            </ul>
+        </div>
+        <h3 class="text-lg font-semibold mb-2">Expense Splits</h3>
+        <ul class="mb-4">
+            {% for split in splits %}
+                <li>{{ split.user.username }} owes ${{ split.share }} for {{ split.expense.description }}</li>
+            {% empty %}
+                <li>No splits yet.</li>
+            {% endfor %}
+        </ul>
+        <div class="mt-4">
+            <p>Share this group:</p>
+            <img src="{% url 'group_qr' group.id %}" alt="QR Code" class="mt-2">
+            <p>Or click to join directly:</p>
+            <form method="post" action="{% url 'join_group_by_id' group.id %}" style="display:inline;">
+                {% csrf_token %}
+                <button type="submit" class="text-blue-500 hover:underline">Join Group</button>
+            </form>
+        </div>
+    </div>
+    <script>
+        async function addExpense() {
+            const desc = document.getElementById('expense-desc').value;
+            const amount = document.getElementById('expense-amount').value;
+            const category = document.getElementById('expense-category').value;
+            if (!desc || !amount || amount <= 0) {
+                document.getElementById('error-message').textContent = 'Please fill all fields with valid values';
+                document.getElementById('error-message').classList.remove('hidden');
+                return;
+            }
+            const response = await fetch('/add_expense/{{ group.id }}/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+                body: JSON.stringify({ description: desc, amount: amount, category: category })
+            });
+            const data = await response.json();
+            if (data.success) {
+                window.location.reload();
+            } else {
+                document.getElementById('error-message').textContent = data.error || 'Error adding expense';
+                document.getElementById('error-message').classList.remove('hidden');
+            }
+        }
+
+        async function payDebt(debtId) {
+            const response = await fetch(`/pay_debt/${debtId}/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+                body: JSON.stringify({})
+            });
+            const data = await response.json();
+            if (data.success) {
+                window.location.reload();
+            } else {
+                document.getElementById('error-message').textContent = data.error || 'Error paying debt';
+                document.getElementById('error-message').classList.remove('hidden');
+            }
+        }
+    </script>
+</body>
+</html>
